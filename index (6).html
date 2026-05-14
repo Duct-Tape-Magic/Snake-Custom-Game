@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Custom Snake</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4ef;
+    --card: #ffffff;
+    --card-border: #d6d3cc;
+    --ink: #1f1e1c;
+    --ink-soft: #6e6b65;
+    --accent: #c96442;
+    --board: #fafaf7;
+    --oob: #8a8780;
+    --grid: #e6e4dc;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--ink); background: var(--bg);
+  }
+  body { display: flex; flex-direction: column; align-items: center; padding: 16px; gap: 12px; }
+
+  header {
+    width: 100%; max-width: 1400px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 4px; gap: 18px; flex-wrap: wrap;
+  }
+  .title {
+    font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px; color: var(--ink);
+  }
+  .title .dot { color: var(--accent); }
+  .help { color: var(--ink-soft); font-size: 12px; font-weight: 500; }
+  .help kbd {
+    display: inline-block;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 4px; padding: 1px 6px;
+    font-family: inherit; font-weight: 600; font-size: 11px;
+    box-shadow: 0 1px 0 var(--card-border);
+    color: var(--ink);
+  }
+
+  .stage {
+    position: relative; flex: 1;
+    width: 100%; max-width: 1400px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas {
+    background: var(--oob);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: block; max-width: 100%; cursor: none;
+  }
+
+  .hud {
+    position: absolute; top: 14px; left: 14px;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    z-index: 3; pointer-events: none;
+  }
+  .card-hud {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 6px 12px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: var(--shadow);
+  }
+  .card-hud .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--ink-soft); font-weight: 700;
+  }
+  .card-hud .value { font-weight: 800; font-size: 18px; }
+  .lives { display: flex; gap: 3px; align-items: center; }
+  .heart { width: 14px; height: 14px; transition: opacity .25s, transform .25s; }
+  .heart.lost { opacity: 0.2; transform: scale(0.85); }
+
+  .stage-btns {
+    position: absolute; top: 14px; right: 14px;
+    display: flex; gap: 6px; z-index: 3;
+  }
+  .icon-btn {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 8px; padding: 7px;
+    cursor: pointer; box-shadow: var(--shadow);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink);
+  }
+  .icon-btn:hover { background: #faf9f5; }
+  .icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .overlay {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(31,30,28,0.5); backdrop-filter: blur(6px);
+    border-radius: 12px; z-index: 5;
+  }
+  .overlay.active { display: flex; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .panel {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 14px; padding: 32px 36px;
+    text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,0.18);
+    max-width: 460px; min-width: 320px;
+  }
+  .panel h2 {
+    font-size: 28px; font-weight: 800;
+    letter-spacing: -0.5px; margin-bottom: 6px;
+  }
+  .panel .subtitle {
+    font-size: 14px; color: var(--ink-soft);
+    margin-bottom: 22px; font-weight: 500;
+  }
+  .stats {
+    display: flex; justify-content: center; gap: 28px;
+    margin-bottom: 22px; padding: 14px;
+    background: var(--bg);
+    border-radius: 10px;
+  }
+  .stat .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--ink-soft); font-weight: 700; margin-bottom: 2px;
+  }
+  .stat .value { font-weight: 800; font-size: 22px; }
+
+  button.cta {
+    font-size: 14px; font-weight: 700;
+    background: var(--accent); color: white;
+    border: 1px solid var(--accent); border-radius: 8px;
+    padding: 10px 22px; cursor: pointer;
+    transition: filter .15s; letter-spacing: 0.3px;
+    font-family: inherit;
+  }
+  button.cta:hover { filter: brightness(0.95); }
+  button.cta.muted { background: var(--ink); border-color: var(--ink); }
+
+  .stage:fullscreen {
+    background: var(--bg); padding: 0; max-width: none;
+    width: 100vw; height: 100vh; border-radius: 0;
+  }
+  .stage:fullscreen canvas {
+    width: 100% !important; height: 100% !important;
+    max-width: none; max-height: none;
+    border-radius: 0; border: none;
+  }
+  .stage:fullscreen .overlay { border-radius: 0; }
+
+  @media (max-width: 700px) {
+    .panel { padding: 22px 20px; } .panel h2 { font-size: 22px; }
+    .help { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">Custom Snake<span class="dot">.</span></div>
+  <div class="help">
+    Aim with <kbd>mouse</kbd> · Hold <kbd>click</kbd> or <kbd>space</kbd> to sprint · <kbd>F</kbd> fullscreen · <kbd>P</kbd> pause
+  </div>
+</header>
+
+<div class="stage" id="stage">
+  <canvas id="board"></canvas>
+
+  <div class="hud">
+    <div class="card-hud"><div><div class="label">Score</div><div class="value" id="score">0</div></div></div>
+    <div class="card-hud"><div><div class="label">Best</div><div class="value" id="best">0</div></div></div>
+    <div class="card-hud"><div><div class="label">Length</div><div class="value" id="len">0</div></div></div>
+    <div class="card-hud"><div><div class="label">Lives</div><div class="lives" id="hearts"></div></div></div>
+  </div>
+
+  <div class="stage-btns">
+    <button class="icon-btn" id="fullscreenBtn" title="Toggle fullscreen (F)">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
+  </div>
+
+  <div class="overlay active" id="startScreen">
+    <div class="panel">
+      <h2>Ready to slither?</h2>
+      <p class="subtitle">Mouse aims. Click or Space sprints. Don't hit walls.</p>
+      <div class="stats">
+        <div class="stat"><div class="label">Lives</div><div class="value">7</div></div>
+        <div class="stat"><div class="label">Best</div><div class="value" id="startBest">0</div></div>
+      </div>
+      <button class="cta" id="startBtn">Start</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="crashScreen">
+    <div class="panel">
+      <h2>You have crashed!</h2>
+      <p class="subtitle" id="crashSub">Watch the walls. Get back in there.</p>
+      <div class="stats">
+        <div class="stat"><div class="label">Score</div><div class="value" id="crashScore">0</div></div>
+        <div class="stat"><div class="label">Lives Left</div><div class="value" id="crashLives">0</div></div>
+      </div>
+      <button class="cta" id="respawnBtn">Respawn</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overScreen">
+    <div class="panel">
+      <h2>Game Over</h2>
+      <p class="subtitle">No lives left. Run it back?</p>
+      <div class="stats">
+        <div class="stat"><div class="label">Final Score</div><div class="value" id="finalScore">0</div></div>
+        <div class="stat"><div class="label">Best</div><div class="value" id="finalBest">0</div></div>
+      </div>
+      <button class="cta muted" id="restartBtn">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // =========================================================
+  //   CONFIG  —  tune everything here
+  // =========================================================
+  const WORLD_W = 3600;
+  const WORLD_H = 2400;
+  const STARTING_LIVES = 7;
+
+  // length = STARTING_LENGTH + LENGTH_PER_SQRT * sqrt(score)
+  const STARTING_LENGTH = 80;
+  const LENGTH_PER_SQRT = 12;
+
+  // radius = STARTING_RADIUS + RADIUS_PER_LOG * ln(score + 1)
+  const STARTING_RADIUS = 11;
+  const RADIUS_PER_LOG = 2.6;
+
+  // viewWidth = STARTING_VIEW + VIEW_PER_LOG * ln(score + 1)   (in world units)
+  const STARTING_VIEW = 850;
+  const VIEW_PER_LOG = 75;
+
+  const BASE_SPEED = 2.6;
+  const SPRINT_SPEED = 4.4;
+  const TURN_RATE = 0.10;
+  const ORB_TARGET = 280;
+  const ORB_RADIUS = 6;
+  const SPRINT_COST_FRAMES = 15;      // every N frames sprinting → -1 score + drop 1 coin
+  const SEGMENT_SPACING_FACTOR = 0.55;
+  const RESPAWN_SAFE_RADIUS = 280;
+
+  const ORB_PALETTE = [
+    '#c96442', '#7a8c7a', '#a89b7e', '#6b7a8c',
+    '#9a8076', '#8a8a82', '#b89968', '#7d8b9a'
+  ];
+
+  // =========================================================
+  //   DOM
+  // =========================================================
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const stage = document.getElementById('stage');
+  const ui = {
+    score: document.getElementById('score'),
+    best: document.getElementById('best'),
+    len: document.getElementById('len'),
+    hearts: document.getElementById('hearts'),
+    startScreen: document.getElementById('startScreen'),
+    startBtn: document.getElementById('startBtn'),
+    startBest: document.getElementById('startBest'),
+    crashScreen: document.getElementById('crashScreen'),
+    crashScore: document.getElementById('crashScore'),
+    crashLives: document.getElementById('crashLives'),
+    crashSub: document.getElementById('crashSub'),
+    respawnBtn: document.getElementById('respawnBtn'),
+    overScreen: document.getElementById('overScreen'),
+    finalScore: document.getElementById('finalScore'),
+    finalBest: document.getElementById('finalBest'),
+    restartBtn: document.getElementById('restartBtn'),
+    fullscreenBtn: document.getElementById('fullscreenBtn'),
+  };
+
+  // =========================================================
+  //   STATE
+  // =========================================================
+  const state = {
+    mode: 'menu',
+    path: [],
+    angle: 0,
+    targetAngle: 0,
+    speed: BASE_SPEED,
+    sprinting: false,
+    sprintCounter: 0,
+    orbs: [],
+    particles: [],
+    score: 0,
+    highScore: Number(localStorage.getItem('customSnakeHighScore') || 0),
+    lives: STARTING_LIVES,
+    mouse: { x: 0, y: 0 },
+    paused: false,
+  };
+
+  // =========================================================
+  //   DERIVED VALUES (functions of score)
+  // =========================================================
+  function targetPathLen() {
+    return Math.floor(STARTING_LENGTH + LENGTH_PER_SQRT * Math.sqrt(state.score));
+  }
+  function segRadius() {
+    return STARTING_RADIUS + RADIUS_PER_LOG * Math.log(state.score + 1);
+  }
+  function viewWidth() {
+    return STARTING_VIEW + VIEW_PER_LOG * Math.log(state.score + 1);
+  }
+  function zoom() {
+    return canvas.width / viewWidth();
+  }
+
+  // =========================================================
+  //   RESIZE
+  // =========================================================
+  function resize() {
+    if (document.fullscreenElement === stage) {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    } else {
+      const maxW = Math.min(window.innerWidth - 32, 1400);
+      const maxH = window.innerHeight - 110;
+      const ratio = 14 / 9;
+      let w = maxW, h = maxW / ratio;
+      if (h > maxH) { h = maxH; w = h * ratio; }
+      canvas.width = Math.floor(w);
+      canvas.height = Math.floor(h);
+    }
+  }
+  window.addEventListener('resize', resize);
+  document.addEventListener('fullscreenchange', resize);
+  resize();
+
+  // =========================================================
+  //   HUD
+  // =========================================================
+  function renderHearts() {
+    ui.hearts.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg';
+    for (let i = 0; i < STARTING_LIVES; i++) {
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'heart' + (i >= state.lives ? ' lost' : ''));
+      svg.setAttribute('viewBox', '0 0 24 24');
+      const p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M12 21s-7-4.5-9.5-9C.8 8.7 2.5 5 6 5c2 0 3.5 1.2 4 2.5C10.5 6.2 12 5 14 5c3.5 0 5.2 3.7 3.5 7C19 16.5 12 21 12 21z');
+      p.setAttribute('fill', i < state.lives ? '#c96442' : '#d6d3cc');
+      svg.appendChild(p);
+      ui.hearts.appendChild(svg);
+    }
+  }
+
+  function refreshHUD() {
+    ui.score.textContent = state.score;
+    ui.best.textContent = state.highScore;
+    ui.len.textContent = targetPathLen();
+    renderHearts();
+  }
+
+  // =========================================================
+  //   ORBS
+  // =========================================================
+  function spawnOrbAt(x, y, color) {
+    state.orbs.push({
+      x, y,
+      color: color || ORB_PALETTE[Math.floor(Math.random() * ORB_PALETTE.length)],
+      r: ORB_RADIUS + Math.random() * 2,
+      pulse: Math.random() * Math.PI * 2,
+    });
+  }
+  function spawnOrb() {
+    spawnOrbAt(
+      40 + Math.random() * (WORLD_W - 80),
+      40 + Math.random() * (WORLD_H - 80)
+    );
+  }
+  function fillOrbs() {
+    while (state.orbs.length < ORB_TARGET) spawnOrb();
+  }
+
+  // =========================================================
+  //   SNAKE INIT / RESPAWN
+  // =========================================================
+  function findSafeSpawn() {
+    for (let i = 0; i < 30; i++) {
+      const x = RESPAWN_SAFE_RADIUS + Math.random() * (WORLD_W - 2 * RESPAWN_SAFE_RADIUS);
+      const y = RESPAWN_SAFE_RADIUS + Math.random() * (WORLD_H - 2 * RESPAWN_SAFE_RADIUS);
+      let ok = true;
+      for (let j = 0; j < state.path.length; j += 6) {
+        const p = state.path[j];
+        const dx = p.x - x, dy = p.y - y;
+        if (dx*dx + dy*dy < RESPAWN_SAFE_RADIUS*RESPAWN_SAFE_RADIUS) { ok = false; break; }
+      }
+      if (ok) return { x, y };
+    }
+    return { x: WORLD_W / 2, y: WORLD_H / 2 };
+  }
+
+  function initSnake(spawn) {
+    const head = spawn || { x: WORLD_W / 2, y: WORLD_H / 2 };
+    const ax = head.x < WORLD_W / 2 ? 1 : -1;
+    const ay = head.y < WORLD_H / 2 ? 0.2 : -0.2;
+    state.angle = Math.atan2(ay, ax);
+    state.targetAngle = state.angle;
+    const L = targetPathLen();
+    state.path = [];
+    for (let i = 0; i < L; i++) {
+      state.path.push({
+        x: head.x - Math.cos(state.angle) * i * (BASE_SPEED * 0.6),
+        y: head.y - Math.sin(state.angle) * i * (BASE_SPEED * 0.6),
+      });
+    }
+  }
+
+  function newGame() {
+    state.score = 0;
+    state.lives = STARTING_LIVES;
+    state.sprinting = false;
+    state.orbs = [];
+    fillOrbs();
+    initSnake(null);
+    state.mode = 'playing';
+    refreshHUD();
+  }
+
+  function respawn() {
+    initSnake(findSafeSpawn());
+    state.mode = 'playing';
+    refreshHUD();
+  }
+
+  // =========================================================
+  //   INPUT
+  // =========================================================
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    state.mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    state.mouse.y = (e.clientY - rect.top)  * (canvas.height / rect.height);
+  });
+  canvas.addEventListener('mousedown', () => { state.sprinting = true; });
+  window.addEventListener('mouseup',   () => { state.sprinting = false; });
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') { state.sprinting = true; e.preventDefault(); }
+    if (e.code === 'KeyP' && state.mode === 'playing') state.paused = !state.paused;
+    if (e.code === 'KeyF') { toggleFullscreen(); e.preventDefault(); }
+  });
+  window.addEventListener('keyup', e => {
+    if (e.code === 'Space') state.sprinting = false;
+  });
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (stage.requestFullscreen) stage.requestFullscreen();
+  }
+  ui.fullscreenBtn.addEventListener('click', toggleFullscreen);
+  ui.startBtn.addEventListener('click',   () => { ui.startScreen.classList.remove('active'); newGame(); });
+  ui.respawnBtn.addEventListener('click', () => { ui.crashScreen.classList.remove('active'); respawn(); });
+  ui.restartBtn.addEventListener('click', () => { ui.overScreen.classList.remove('active'); newGame(); });
+
+  // =========================================================
+  //   UPDATE
+  // =========================================================
+  function update() {
+    if (state.mode !== 'playing' || state.paused) return;
+
+    const head = state.path[0];
+    const z = zoom();
+
+    // Mouse (canvas pixels) → world coords (head is at canvas center)
+    const mxWorld = head.x + (state.mouse.x - canvas.width / 2) / z;
+    const myWorld = head.y + (state.mouse.y - canvas.height / 2) / z;
+    state.targetAngle = Math.atan2(myWorld - head.y, mxWorld - head.x);
+
+    let diff = state.targetAngle - state.angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    state.angle += Math.max(-TURN_RATE, Math.min(TURN_RATE, diff));
+
+    // Sprint: costs 1 score and drops 1 coin every SPRINT_COST_FRAMES
+    const canSprint = state.sprinting && state.score > 0;
+    state.speed = canSprint ? SPRINT_SPEED : BASE_SPEED;
+    if (canSprint) {
+      state.sprintCounter++;
+      if (state.sprintCounter >= SPRINT_COST_FRAMES) {
+        state.sprintCounter = 0;
+        state.score = Math.max(0, state.score - 1);
+        const tail = state.path[state.path.length - 1];
+        if (tail) {
+          spawnOrbAt(
+            tail.x + (Math.random() - 0.5) * 22,
+            tail.y + (Math.random() - 0.5) * 22
+          );
+        }
+      }
+    } else {
+      state.sprintCounter = 0;
+    }
+
+    // Move head
+    const nx = head.x + Math.cos(state.angle) * state.speed;
+    const ny = head.y + Math.sin(state.angle) * state.speed;
+
+    // Wall collision
+    const r = segRadius();
+    if (nx < r || nx > WORLD_W - r || ny < r || ny > WORLD_H - r) {
+      onCrash();
+      return;
+    }
+
+    state.path.unshift({ x: nx, y: ny });
+    const L = targetPathLen();
+    while (state.path.length > L) state.path.pop();
+
+    // Orb pickup — 1 point each
+    const hitR = r + ORB_RADIUS + 4;
+    for (let i = state.orbs.length - 1; i >= 0; i--) {
+      const o = state.orbs[i];
+      const dx = o.x - nx, dy = o.y - ny;
+      if (dx*dx + dy*dy < hitR*hitR) {
+        state.orbs.splice(i, 1);
+        state.score += 1;
+        burst(o.x, o.y, o.color);
+      }
+    }
+    fillOrbs();
+
+    for (let i = state.particles.length - 1; i >= 0; i--) {
+      const p = state.particles[i];
+      p.x += p.vx; p.y += p.vy;
+      p.vx *= 0.92; p.vy *= 0.92;
+      p.life--;
+      if (p.life <= 0) state.particles.splice(i, 1);
+    }
+    for (const o of state.orbs) o.pulse += 0.08;
+
+    refreshHUD();
+  }
+
+  function burst(x, y, color) {
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = 1 + Math.random() * 2.5;
+      state.particles.push({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        life: 20, maxLife: 20, color, r: 2 + Math.random() * 1.5,
+      });
+    }
+  }
+
+  function onCrash() {
+    state.mode = 'crashed';
+    state.lives--;
+    burst(state.path[0].x, state.path[0].y, '#c96442');
+    refreshHUD();
+    if (state.score > state.highScore) {
+      state.highScore = state.score;
+      localStorage.setItem('customSnakeHighScore', String(state.highScore));
+    }
+    if (state.lives <= 0) {
+      ui.finalScore.textContent = state.score;
+      ui.finalBest.textContent = state.highScore;
+      ui.overScreen.classList.add('active');
+      state.mode = 'over';
+    } else {
+      ui.crashScore.textContent = state.score;
+      ui.crashLives.textContent = state.lives;
+      ui.crashSub.textContent = state.lives === 1 ? "Last life. Make it count." : "Watch the walls. Try again?";
+      ui.crashScreen.classList.add('active');
+    }
+  }
+
+  // =========================================================
+  //   RENDER
+  // =========================================================
+  function draw() {
+    // Out-of-bounds gray fills the whole canvas first
+    ctx.fillStyle = '#8a8780';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (state.path.length === 0) return;
+    const head = state.path[0];
+    const z = zoom();
+
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(z, z);
+    ctx.translate(-head.x, -head.y);
+
+    // Board interior
+    ctx.fillStyle = '#fafaf7';
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+
+    drawGrid(head, z);
+    drawWalls();
+    drawOrbs();
+    drawSnake();
+    drawParticles();
+    drawCursor(head, z);
+
+    ctx.restore();
+  }
+
+  function drawGrid(head, z) {
+    const halfW = (canvas.width / z) / 2;
+    const halfH = (canvas.height / z) / 2;
+    const minX = Math.max(0, head.x - halfW);
+    const maxX = Math.min(WORLD_W, head.x + halfW);
+    const minY = Math.max(0, head.y - halfH);
+    const maxY = Math.min(WORLD_H, head.y + halfH);
+    const step = 80;
+    const x0 = Math.floor(minX / step) * step;
+    const y0 = Math.floor(minY / step) * step;
+    ctx.strokeStyle = '#e6e4dc';
+    ctx.lineWidth = 1 / z;
+    ctx.beginPath();
+    for (let x = x0; x <= maxX + step; x += step) {
+      ctx.moveTo(x, minY); ctx.lineTo(x, maxY);
+    }
+    for (let y = y0; y <= maxY + step; y += step) {
+      ctx.moveTo(minX, y); ctx.lineTo(maxX, y);
+    }
+    ctx.stroke();
+  }
+
+  function drawWalls() {
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#1f1e1c';
+    ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
+  }
+
+  function drawOrbs() {
+    for (const o of state.orbs) {
+      const pulse = 1 + Math.sin(o.pulse) * 0.12;
+      const r = o.r * pulse;
+      const grd = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, r * 3);
+      grd.addColorStop(0, o.color + 'cc');
+      grd.addColorStop(0.4, o.color + '44');
+      grd.addColorStop(1, o.color + '00');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, r * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = o.color;
+      ctx.beginPath();
+      ctx.arc(o.x, o.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.arc(o.x - r * 0.3, o.y - r * 0.3, r * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawSnake() {
+    if (state.path.length === 0) return;
+    const r = segRadius();
+    const spacing = Math.max(1, r * SEGMENT_SPACING_FACTOR);
+
+    const indices = [state.path.length - 1];
+    let dist = 0;
+    for (let i = state.path.length - 2; i >= 0; i--) {
+      const a = state.path[i + 1], b = state.path[i];
+      dist += Math.hypot(b.x - a.x, b.y - a.y);
+      if (dist >= spacing) { indices.push(i); dist = 0; }
+    }
+    if (indices[indices.length - 1] !== 0) indices.push(0);
+
+    for (let k = 0; k < indices.length; k++) {
+      const p = state.path[indices[k]];
+      const t = k / Math.max(1, indices.length - 1);
+      const shade = 50 + Math.floor(t * 30);
+      ctx.fillStyle = `rgb(${shade}, ${shade}, ${shade + 4})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      ctx.beginPath();
+      ctx.arc(p.x - r * 0.25, p.y - r * 0.3, r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (state.sprinting && state.score > 0) {
+      ctx.fillStyle = 'rgba(201,100,66,0.28)';
+      for (let i = 1; i < 6 && i < state.path.length; i += 2) {
+        const t = state.path[i];
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, r + 4 - i * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const head = state.path[0];
+    const eyeOffset = r * 0.45;
+    const perpX = -Math.sin(state.angle), perpY = Math.cos(state.angle);
+    const fwdX  =  Math.cos(state.angle), fwdY  = Math.sin(state.angle);
+    const drawEye = (sx, sy) => {
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(sx, sy, r * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#1f1e1c';
+      const pa = state.targetAngle;
+      ctx.beginPath();
+      ctx.arc(sx + Math.cos(pa) * r * 0.12, sy + Math.sin(pa) * r * 0.12, r * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    drawEye(head.x + fwdX * r * 0.35 + perpX * eyeOffset, head.y + fwdY * r * 0.35 + perpY * eyeOffset);
+    drawEye(head.x + fwdX * r * 0.35 - perpX * eyeOffset, head.y + fwdY * r * 0.35 - perpY * eyeOffset);
+  }
+
+  function drawParticles() {
+    for (const p of state.particles) {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawCursor(head, z) {
+    const mxWorld = head.x + (state.mouse.x - canvas.width / 2) / z;
+    const myWorld = head.y + (state.mouse.y - canvas.height / 2) / z;
+    ctx.strokeStyle = 'rgba(31,30,28,0.4)';
+    ctx.lineWidth = 2 / z;
+    ctx.beginPath();
+    ctx.arc(mxWorld, myWorld, 10 / z, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(31,30,28,0.6)';
+    ctx.beginPath();
+    ctx.arc(mxWorld, myWorld, 2 / z, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  ui.startBest.textContent = state.highScore;
+  refreshHUD();
+  initSnake(null);
+  loop();
+})();
+</script>
+</body>
+</html>
